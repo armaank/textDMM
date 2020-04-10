@@ -8,6 +8,7 @@ import torch
 import torchtext
 from torchtext.datasets import text_classification
 
+
 def main():
 
     parser = argparse.ArgumentParser(
@@ -15,11 +16,11 @@ def main():
     )
     parser.add_argument("--dataset", default="AG_NEWS", help="dataset name")
     parser.add_argument("--ngrams", type=int, default=2, help="ngrams")
-    parser.add_argument("--root", default="./data", help="data directory")
+    parser.add_argument("--root", default="./ag_news", help="data directory")
     args = parser.parse_args()
 
     dataset = args.dataset
-    
+
     train_dataset, test_dataset = text_classification.DATASETS[dataset](
         root=args.root, ngrams=args.ngrams
     )
@@ -34,7 +35,8 @@ def main():
     print("saving test data to {}".format(test_data_path))
     torch.save(test_dataset, test_data_path)
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
 
     main()
 
