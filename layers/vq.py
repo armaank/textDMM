@@ -1,5 +1,2 @@
 """vector quantized embedding layers
 """
-
-
-

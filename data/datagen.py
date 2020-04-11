@@ -1,4 +1,4 @@
-"""datagen
+"""datagen, possibly un-needed
 """
 
 import argparse
