@@ -1,2 +1,2 @@
-"""infer
+"""inference
 """

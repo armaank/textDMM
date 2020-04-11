@@ -1,4 +1,5 @@
-"""vector quantizaters
+"""vector quantized embedding layers
 """
+
 
 

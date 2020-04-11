@@ -21,6 +21,7 @@ def main():
 
     dataset = args.dataset
 
+    # might be able to remove ngrams
     train_dataset, test_dataset = text_classification.DATASETS[dataset](
         root=args.root, ngrams=args.ngrams
     )
