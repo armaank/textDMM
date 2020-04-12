@@ -43,7 +43,7 @@ class LSTMCAT(nn.Module):
         # init layers
         self.embedding = nn.Embedding(dict_size, embed_dim)
 
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim, num_layers=1)
+        self.lstm = nn.LSTM(embed_dim, hidden_dim, num_layers=1)
 
         self.hidden = nn.Linear(hidden_dim, output_size)
 

@@ -65,9 +65,9 @@ class TextLoader(object):
                     for token in line:
                         tokens.add(token)
 
-        return tokens, dataset
+        return tokens, data
 
-    def split_set(self, dataset):
+    def split_set(self, data):
         """
         perform training, testing, validation split
         """
@@ -88,10 +88,10 @@ class TextLoader(object):
         val_ratio = int(len(all_data) * 0.9)
 
         train_dataset = all_data[:train_ratio]
-        val_dataset = all_data[train_ratio:dev_ratio]
-        test_dataset = all_data[dev_ratio:]
+        val_dataset = all_data[train_ratio:val_ratio]
+        test_dataset = all_data[val_ratio:]
 
-        return train_dataset, val_dataset, test_datset
+        return train_dataset, val_dataset, test_dataset
 
     def set2id(self, item_set, pad=None, unk=None):
 
@@ -139,7 +139,7 @@ class TextDataset(Dataset):
         return self.data_tensor.size(0)
 
 
-def vectorized_data(data, item2id):
+def vectorize_data(data, item2id):
     """
 
     """
@@ -169,7 +169,7 @@ def create_dataset(data, input2id, target2id, batch_size=4):
 
     """
 
-    vectorized_seqs = vectorized_data(data, input2id)
+    vectorized_seqs = vectorize_data(data, input2id)
 
     seq_lengths = torch.LongTensor([len(s) for s in vectorized_seqs])
     seq_tensor = pad_sequences(vectorized_seqs, seq_lengths)
@@ -198,5 +198,6 @@ if __name__ == "__main__":
     """
     testing
     """
+    test = TextLoader()
 
     pass
