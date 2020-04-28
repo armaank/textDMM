@@ -15,6 +15,8 @@ import pyro.poutine as poutine
 from torch.autograd import Variable
 from pyro.distributions import TransformedDistribution
 
+import utils
+
 
 class Emitter(nn.Module):
     """
@@ -241,7 +243,7 @@ class DMM(nn.Module):
         rnn_output, _ = self.rnn(batch_reversed, h_0_contig)
 
         # reverse and unpack rnn output
-        rnn_output = pad_reverse(rnn_output, batch_seqlens)
+        rnn_output = utils.pad_reverse(rnn_output, batch_seqlens)
 
         # setup recursive conditioning
         z_prev = self.z_q_0.expand(batch.size(0), self.z_q_0.size(0))

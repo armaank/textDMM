@@ -3,6 +3,10 @@ todo: add comments
 """
 import logging
 
+import torch
+
+from torch import nn
+
 
 def get_logger(log_file):
     logging.basicConfig(
@@ -16,3 +20,42 @@ def get_logger(log_file):
         logging.info(s)
 
     return log
+
+
+def reverse_seq(batch, seqlens):
+    """
+    reverses a batch temporally
+    """
+    reversed_btach = torch.zeros_like(batch)
+
+    for ii in range(mini_batch.size(0)):
+
+        T = seqlens[ii]
+        t_slice = torch.arrange(T - 1, -1, -1)  # TODO: add device?
+        reversed_seq = torch.index_select(batch[ii, :, :], 0, t_slice)
+        reversed_batch[ii, 0:T, :] = reversed_seq
+
+    return reversed_batch
+
+
+def pad_and_reverse(rnn_output, seqlens):
+    """
+    unpacks hidden state as output of a torch rnn and reverses each seq
+    """
+
+    rnn_output, _ = nn.utils.pad_packed_sequence(rnn_output, batch_first=True)
+    reversed_output = reverse_sequences(rnn_output, seqlens)
+
+    return reversed_output
+
+
+def generate_batch_mask(batch, seqlens):
+    """
+    makes a temporal mask
+    """
+
+    mask = torch.zeros(batch.shape[0:2])
+    for ii in range(batch.shape[0]):
+        mask[ii, 0 : seqlens[ii]] = torch.ones(seqlens[ii])
+
+    return mask
