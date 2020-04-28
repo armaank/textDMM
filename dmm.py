@@ -176,7 +176,7 @@ class DMM(nn.Module):
 
         pass
 
-    def model(self, batch, reversed_batch, batch_mask, batch_seqlen, kl_anneal=1.0):
+    def model(self, batch, reversed_batch, batch_mask, batch_seqlens, kl_anneal=1.0):
         """
         the model defines p(x_{1:T}|z_{1:T}) and p(z_{1:T})
         """
@@ -222,6 +222,48 @@ class DMM(nn.Module):
                 z_prev = z_t
         pass
 
-    def guide():
+    def guide(self, batch, reversed_batch, batch_mask, batch_seqlens, kl_anneal=1.0):
+        """
+        the guide defines the variational distribution q(z_{1:T}|x_x{1:T})
+        """
+        # maximum duration of batch
+        Tmax = batch.size(1)
+
+        # register torch submodules w/ pyro
+        pyro.module("dmm", self)
+
+        # to parallelize, we broadcast rnn into continguous gpu memory
+        h_0_contig = self.h_0.expand(
+            1, batch_size(0), self.rnn.hidden_size
+        ).contiguous()
+
+        # push observed sequence through rnn
+        rnn_output, _ = self.rnn(batch_reversed, h_0_contig)
+
+        # reverse and unpack rnn output
+        rnn_output = pad_reverse(rnn_output, batch_seqlens)
+
+        # setup recursive conditioning
+        z_prev = self.z_q_0.expand(batch.size(0), self.z_q_0.size(0))
+
+        with pyro.plate("z_batch", len(mini_batch)):
+
+            for t in pyro.markov(range(1, Tmax + 1)):
+
+                z_loc, z_scale = self.combiner(z_prev, rnn_output[:, t - 1, :])
+
+                z_dist = dist.Normal(z_loc, z_scale)
+
+                assert z_dist.event_shape == ()
+                assert z_dist.batch_shape[-2:] == len(batch) == self.z_q_0.size(0)
+
+                # sample z_t from distribution z_dist
+                with pyro.poutine.scale(scale=kl_anneal):
+                    z_t = pyro.samle(
+                        "z_%d" % t, z_dist.mask(batch[:, t - 1 : t]).to_event(1)
+                    )
+
+                # set conditional var for next time step
+                z_prev = z_t
 
         pass
