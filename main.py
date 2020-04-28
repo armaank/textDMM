@@ -35,11 +35,12 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=1e-4, type=float, help="ADAM learning rate")
     parser.add_argument("--beta1", default=0.9, type=float, help="ADAM beta1")
     parser.add_argument("--beta2", default=0.999, type=float, help="ADAM beta2")
+    parser.add_argument("--wd", default=2.0, type=float, help="weight decay")
     parser.add_argument("--cn", default=0.001, type=float, help="grad. clipping")
     parser.add_arugment(
         "--lr_decay", default - 0.99996, type=float, help="learning rate decay"
     )
-    parser.add_arugment("--ae", default=1000, type=float, help="kl annealing epochs")
+    parser.add_arugment("--kl_ae", default=1000, type=float, help="kl annealing epochs")
     parser.add_argument(
         "--maf", default=0.2, type=float, help="minimum annealing factor"
     )
