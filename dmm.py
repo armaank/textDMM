@@ -133,16 +133,93 @@ class DMM(nn.Module):
     module for the model and the guide (variational distribution) for the DMM
     """
 
-    def __init__():
+    def __init__(
+        self,
+        input_dim=52,
+        z_dim=100,
+        emissions_dim=100,
+        transition_dim=200,
+        rnn_dim=600,
+        num_layers=1,
+        dropout=0.0,
+    ):
         super().__init__()
         """
-        text
+        instantiate modules used in the model and guide
         """
+        self.emitter = Emitter(intput_dim, z_dim, emission_dim)
+        self.transition = GatedTransition(z_dim, transition_dim)
+        self.combiner = Combiner(z_dim, rnn_dim)
+
+        # TODO: alter dropout scheme
+        if num_layers == 1:
+            rnn_dropout = 0.0
+        else:
+            rnn_dropout = dropout
+
+        # TODO: add option for bidirectional rnn?
+        self.rnn = nn.RNN(
+            input_size=input_dim,
+            hidden_size=rnn_dim,
+            nonlinearity="relu",
+            batch_first=True,
+            bidirectional=False,
+            num_layers=num_layers,
+            dropout=rnn_drouput,
+        )
+        """
+        define learned parameters that define the probability distributions P(z_1) and q(z_1) and hidden state of rnn
+        """
+        self.z_0 = nn.Parameter(torch.zeros(z_dim))
+        self.z_q_0 = nn.Parameter(torch.zeros(z_dim))
+        self.h_0 = nn.Parameter(torch.zeros(1, 1, rnn_dim))
 
         pass
 
-    def model():
+    def model(self, batch, reversed_batch, batch_mask, batch_seqlen, kl_anneal=1.0):
+        """
+        the model defines p(x_{1:T}|z_{1:T}) and p(z_{1:T})
+        """
+        # maximum duration of batch
+        Tmax = batch.size(1)
 
+        # register torch submodules w/ pyro
+        pyro.module("dmm", self)
+
+        # setup recursive conditioning for p(z_t|z_{t-1})
+        z_prev = self.z_0.expand(batch.size(0), self.z_0.size(0))
+
+        # sample conditionally indepdent text across the batch
+        with pyro.plate("z_batch", len(batch)):
+            # sample latent vars z and observed x w/ multiple samples from the guide for each z
+            for t in pyro.markov(range(1, Tmax + 1)):
+
+                # compute params of diagonal gaussian p(z_t|z_{t-1})
+                z_loc, z_scale = self.trans(z_prev)
+
+                # sample latent variable
+                with poutine.scale(scale=kl_anneal):
+                    z_t = pyro.sample(
+                        "z_%d" % t,
+                        dist.Normal(z_loc, z_scale)
+                        .mask(batch_mask[:, t - 1 : t])
+                        .to_event(1),
+                    )
+
+                # compute emission probability from latent variable
+                emission_prob = self.emitter(z_t)
+
+                # observe x_t according to the Categorical distribution defined by the emitter probability
+                pyro.sample(
+                    "obs_x_%d" % t,
+                    dist.OneHotCategorical(emission_prob)
+                    .mask(batch_mask[:, t - 1 : t])
+                    .to_event(1),
+                    obs=batch[:, t - 1, :],
+                )
+
+                # set conditional var for next time step
+                z_prev = z_t
         pass
 
     def guide():
