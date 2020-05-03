@@ -79,12 +79,47 @@ class Trainer(object):
 
         return loss
 
-    def train_batch(self, train_iter):
+    def train_batch(self, train_iter, epoch):
         """
-        process a batch
+        process a batch (single epoch)
         """
+        batch_loss = 0
+        loss = 0
+        for ii, batch in enumerate(iter(train_iter)):
 
-        pass
+            batch_data = Variable(batch.text[0].to(self.device))
+            seqlens = Variable(batch.text[1].to(self.device))
+
+            # transpose to [B, seqlen, vocab_size] shape
+            batch_data = torch.t(batch_data)
+            # compute one hot character embedding
+            batch = nn.functional.one_hot(batch_data, self.vocab_size).float()
+            # flip sequence for rnn
+            batch_reversed = utils.reverse_seq(batch, seqlens)
+            batch_reversed = nn.utils.rnn.pack_padded_sequence(
+                batch_reversed, seqlens, batch_first=True
+            )
+            # compute temporal mask
+            batch_mask = utils.get_batch_mask(batch, seqlens).cuda()
+
+            # compute kl-div annealing factor
+            if self.kl_ae > 0 and epoch < self.kl_ae:
+                min_af = self.maf
+                kl_anneal = min_af + (1 - min_af) * (
+                    float(ii + epoch * self.N_batches + 1)
+                    / float(args.kl_ae * self.N_batches)
+                )
+            else:
+                # default kl-div annealing factor is unity
+                kl_anneal = 1.0
+
+            # take gradient step
+            batch_loss = self.svi.step(
+                batch_data, batch_reversed, batch_mask, seqlens, kl_anneal
+            )
+            loss += batch_loss / (torch.sum(seqlens).float())
+
+        return loss
 
     def train(self):
         """
@@ -129,6 +164,8 @@ class Trainer(object):
         self.elbo = Trace_ELBO()
         self.svi = SVI(dmm.model, dmm.guide, loss=elbo)
 
+        # TODO: compute number of minibatches
+
         val_f = 10
 
         print("training dmm")
@@ -139,7 +176,7 @@ class Trainer(object):
                 save_ckpt()
 
             # train and report metrics
-            train_nll = train_batch(train_iter)
+            train_nll = train_batch(train_iter, epoch,)
 
             times.append(time.time())
             t_elps = times[-1] - times[-2]
