@@ -1,0 +1,7 @@
+- discuss character level language model
+- present novel method - dmm
+--> go into background on how/why it works
+--->pyro, papers, etc
+--> why should this work for text? - other markov char-lms
+- results & discussion
+-conclude
