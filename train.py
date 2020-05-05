@@ -75,7 +75,7 @@ class Trainer(object):
         self.dmm.rnn.train()
 
         # report loss TODO: normalize
-        loss = val_loss
+        loss = val_nll / self.N_val_data
 
         return loss
 
@@ -147,6 +147,14 @@ class Trainer(object):
             sort_key=lambda x: len(x.text),
             sort_within_batch=True,
         )
+        self.N_train_data = len(train)
+        self.N_val_data = len(val)
+        self.N_batches = int(
+            self.N_train_data / self.batch_size
+            + int(self.N_train_data % self.batch_size > 0)
+        )
+
+        # TODO: might need to compute number of time slices for normalization
 
         # instantiate the dmm
         self.dmm = DMM(input_dim=self.vocab_size, dropout=self.dropout)
@@ -164,8 +172,6 @@ class Trainer(object):
         self.elbo = Trace_ELBO()
         self.svi = SVI(dmm.model, dmm.guide, loss=elbo)
 
-        # TODO: compute number of minibatches
-
         val_f = 10
 
         print("training dmm")
@@ -176,7 +182,7 @@ class Trainer(object):
                 save_ckpt()
 
             # train and report metrics
-            train_nll = train_batch(train_iter, epoch,)
+            train_nll = train_batch(train_iter, epoch)
 
             times.append(time.time())
             t_elps = times[-1] - times[-2]
