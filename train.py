@@ -2,15 +2,22 @@
 """
 import os
 import random
+import time
 
-import numpy
-import torch
+import numpy as np
 import pyro
+import torch
+
+import torchtext
+
+from torch import nn
 
 from pyro.infer import SVI, Trace_ELBO
+from pyro.optim import ClippedAdam
+from torch.autograd import Variable
 
-import util
-import dataloader
+import utils
+import datahandler
 from dmm import DMM
 
 
@@ -22,7 +29,7 @@ class Trainer(object):
     def __init__(self, args):
 
         # argument gathering
-        self.seed = args.rand_seed
+        self.rand_seed = args.rand_seed
         self.dev_num = args.dev_num
         self.cuda = args.cuda
         self.n_epoch = args.n_epoch
@@ -33,7 +40,7 @@ class Trainer(object):
         self.wd = args.wd
         self.cn = args.cn
         self.lr_decay = args.lr_decay
-        self.ae = args.kl_ae
+        self.kl_ae = args.kl_ae
         self.maf = args.maf
         self.dropout = args.dropout
         self.ckpt_f = args.ckpt_f
@@ -43,7 +50,7 @@ class Trainer(object):
         self.save_model = args.save_model
         self.log = args.log
 
-    def validate(self, val_iter):
+    def _validate(self, val_iter):
         """
         freezes training and validates on the network with a validation set
         """
@@ -65,7 +72,7 @@ class Trainer(object):
                 batch_reversed, seqlens, batch_first=True
             )
             # compute temporal mask
-            batch_mask = utils.get_batch_mask(batch, seqlens).cuda()
+            batch_mask = utils.generate_batch_mask(batch, seqlens).cuda()
             # perform evaluation
             val_nll += self.svi.evaluate_loss(
                 batch, batch_reversed, batch_mask, seqlens
@@ -75,11 +82,11 @@ class Trainer(object):
         self.dmm.rnn.train()
 
         # report loss TODO: normalize
-        loss = val_nll / self.N_val_data
+        loss = val_loss / self.N_val_data
 
         return loss
 
-    def train_batch(self, train_iter, epoch):
+    def _train_batch(self, train_iter, epoch):
         """
         process a batch (single epoch)
         """
@@ -100,14 +107,14 @@ class Trainer(object):
                 batch_reversed, seqlens, batch_first=True
             )
             # compute temporal mask
-            batch_mask = utils.get_batch_mask(batch, seqlens).cuda()
+            batch_mask = utils.generate_batch_mask(batch, seqlens).cuda()
 
             # compute kl-div annealing factor
             if self.kl_ae > 0 and epoch < self.kl_ae:
                 min_af = self.maf
                 kl_anneal = min_af + (1 - min_af) * (
                     float(ii + epoch * self.N_batches + 1)
-                    / float(args.kl_ae * self.N_batches)
+                    / float(self.kl_ae * self.N_batches)
                 )
             else:
                 # default kl-div annealing factor is unity
@@ -131,18 +138,21 @@ class Trainer(object):
         torch.manual_seed(self.rand_seed)
 
         # setup logging
-        log = get_logger(self.log)
+        log = utils.get_logger(self.log)
+
+        # TODO: make max_len a cli arg
+        max_len = 288
 
         # load dataset TODO: make data fpath cli arg
-        (train, val, test), vocab = datahandler.load_data("./data/ptb")
+        train, val, test, vocab = datahandler.load_data("./data/ptb", 288)
 
         self.vocab_size = len(vocab)
 
         # make iterable dataset object
         train_iter, val_iter, test_iter = torchtext.data.BucketIterator.splits(
             (train, val, test),
-            batch_sizes=[args.batch_Size, 1, 1],
-            device=device,
+            batch_sizes=[self.batch_size, 1, 1],
+            device=self.device,
             repeat=False,
             sort_key=lambda x: len(x.text),
             sort_within_batch=True,
@@ -155,6 +165,13 @@ class Trainer(object):
         )
 
         # TODO: might need to compute number of time slices for normalization
+
+        self.N_train_data = len(train)
+        self.N_val_data = len(val)
+        self.N_batches = int(
+            self.N_train_data / self.batch_size
+            + int(self.N_train_data % self.batch_size > 0)
+        )
 
         # instantiate the dmm
         self.dmm = DMM(input_dim=self.vocab_size, dropout=self.dropout)
@@ -170,19 +187,19 @@ class Trainer(object):
         self.adam = ClippedAdam(opt_params)
         # set up inference algorithm
         self.elbo = Trace_ELBO()
-        self.svi = SVI(dmm.model, dmm.guide, loss=elbo)
+        self.svi = SVI(self.dmm.model, self.dmm.guide, self.adam, loss=self.elbo)
 
         val_f = 10
 
         print("training dmm")
         times = [time.time()]
-        for epoch in range(self.n_epochs):
+        for epoch in range(self.n_epoch):
 
             if self.ckpt_f > 0 and epoch > 0 and epoch % self.ckpt_f == 0:
                 save_ckpt()
 
             # train and report metrics
-            train_nll = train_batch(train_iter, epoch)
+            train_nll = self._train_batch(train_iter, epoch,)
 
             times.append(time.time())
             t_elps = times[-1] - times[-2]
@@ -192,7 +209,7 @@ class Trainer(object):
             )
 
             if epoch % val_f == 0:
-                val_nll = validate(val_iter)
+                val_nll = self._validate(val_iter)
         pass
 
     def save_ckpt(self):
