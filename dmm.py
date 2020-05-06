@@ -176,6 +176,8 @@ class DMM(nn.Module):
         self.z_q_0 = nn.Parameter(torch.zeros(z_dim))
         self.h_0 = nn.Parameter(torch.zeros(1, 1, rnn_dim))
 
+        self.cuda()
+
         pass
 
     def model(self, batch, reversed_batch, batch_mask, batch_seqlens, kl_anneal=1.0):

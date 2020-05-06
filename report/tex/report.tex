@@ -76,7 +76,7 @@ We use Monte Carlo estimates of the KL divergence term.
 
 \paragraph{} We were able to ....
 
-\paragraph{} These aforementioned issues might be resolved by using a different method for KL annealing, which can improve stability during training. Furthermore, we use a Monte Carlo estimates of the KL divergence, leading to higher variance gradient estimates of the ELBO loss, which can also destabilize performance during early training periods. We might also trying using an LSTM architecture to parametrize our transmission and emission probabilities over the so-called `vanilla' RNN. On a related note, one possibility is that exploding gradients are caused by lengthy input sequences, so one way to resolve this issue would be to only train on shorter sequences of characters. 
+\paragraph{} These aforementioned issues might be resolved by using a different method for KL annealing, which can improve stability during training. Furthermore, we use a Monte Carlo estimate of the KL divergence, leading to higher variance gradient estimates of the ELBO loss, which can also destabilize performance during early training periods. We might also trying using an LSTM architecture to parametrize our transmission and emission probabilities over the so-called `vanilla' RNN. On a related note, one possibility is that exploding gradients are caused by lengthy input sequences, so one way to resolve this issue would be to only train on shorter sequences of characters. 
 
 \section{Conclusion}
 
