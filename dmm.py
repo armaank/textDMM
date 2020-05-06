@@ -139,7 +139,7 @@ class DMM(nn.Module):
         self,
         input_dim=52,
         z_dim=100,
-        emissions_dim=100,
+        emission_dim=100,
         transition_dim=200,
         rnn_dim=600,
         num_layers=1,
@@ -149,7 +149,7 @@ class DMM(nn.Module):
         """
         instantiate modules used in the model and guide
         """
-        self.emitter = Emitter(intput_dim, z_dim, emission_dim)
+        self.emitter = Emitter(input_dim, z_dim, emission_dim)
         self.transition = GatedTransition(z_dim, transition_dim)
         self.combiner = Combiner(z_dim, rnn_dim)
 
@@ -167,7 +167,7 @@ class DMM(nn.Module):
             batch_first=True,
             bidirectional=False,
             num_layers=num_layers,
-            dropout=rnn_drouput,
+            dropout=rnn_dropout,
         )
         """
         define learned parameters that define the probability distributions P(z_1) and q(z_1) and hidden state of rnn
@@ -236,11 +236,11 @@ class DMM(nn.Module):
 
         # to parallelize, we broadcast rnn into continguous gpu memory
         h_0_contig = self.h_0.expand(
-            1, batch_size(0), self.rnn.hidden_size
+            1, batch.size(0), self.rnn.hidden_size
         ).contiguous()
 
         # push observed sequence through rnn
-        rnn_output, _ = self.rnn(batch_reversed, h_0_contig)
+        rnn_output, _ = self.rnn(reversed_batch, h_0_contig)
 
         # reverse and unpack rnn output
         rnn_output = utils.pad_reverse(rnn_output, batch_seqlens)

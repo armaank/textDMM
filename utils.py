@@ -26,12 +26,12 @@ def reverse_seq(batch, seqlens):
     """
     reverses a batch temporally
     """
-    reversed_btach = torch.zeros_like(batch)
+    reversed_batch = torch.zeros_like(batch)
 
-    for ii in range(mini_batch.size(0)):
+    for ii in range(batch.size(0)):
 
         T = seqlens[ii]
-        t_slice = torch.arrange(T - 1, -1, -1)  # TODO: add device?
+        t_slice = torch.arange(T - 1, -1, -1, device=batch.device)  # TODO: add device?
         reversed_seq = torch.index_select(batch[ii, :, :], 0, t_slice)
         reversed_batch[ii, 0:T, :] = reversed_seq
 

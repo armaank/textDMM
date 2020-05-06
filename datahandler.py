@@ -35,7 +35,7 @@ class lmDataset(data.Dataset):
                     text += [u"<eos"]
                 examples.append(data.Example.fromlist([text], fields))
 
-        super().__init__(examples, fields, **kwards)
+        super().__init__(examples, fields, **kwargs)
 
 
 def load_data(dataset_fpath, max_len):
@@ -50,9 +50,9 @@ def load_data(dataset_fpath, max_len):
 
     train, val, test = lmDataset.splits(
         path=dataset_fpath,
-        train="train.txt",
-        validation="validation.txt",
-        test="test.txt",
+        train="ptb.train.txt",
+        validation="ptb.valid.txt",
+        test="ptb.test.txt",
         text_field=text,
         eos=True,
         filter_pred=lambda x: len(vars(x)["text"]) <= max_len
