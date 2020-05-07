@@ -199,7 +199,7 @@ class DMM(nn.Module):
             for t in pyro.markov(range(1, Tmax + 1)):
 
                 # compute params of diagonal gaussian p(z_t|z_{t-1})
-                z_loc, z_scale = self.trans(z_prev)
+                z_loc, z_scale = self.transition(z_prev)
 
                 # sample latent variable
                 with poutine.scale(scale=kl_anneal):
@@ -245,26 +245,29 @@ class DMM(nn.Module):
         rnn_output, _ = self.rnn(reversed_batch, h_0_contig)
 
         # reverse and unpack rnn output
-        rnn_output = utils.pad_reverse(rnn_output, batch_seqlens)
+        rnn_output = utils.pad_and_reverse(rnn_output, batch_seqlens)
 
         # setup recursive conditioning
         z_prev = self.z_q_0.expand(batch.size(0), self.z_q_0.size(0))
 
-        with pyro.plate("z_batch", len(mini_batch)):
+        with pyro.plate("z_batch", len(batch)):
 
             for t in pyro.markov(range(1, Tmax + 1)):
 
                 z_loc, z_scale = self.combiner(z_prev, rnn_output[:, t - 1, :])
 
                 z_dist = dist.Normal(z_loc, z_scale)
-
+                #print(batch.shape)
+                #print(len(batch))
+                #print(z_dist.batch_shape[-2:])
+                #print(self.z_q_0.size(0))
                 assert z_dist.event_shape == ()
-                assert z_dist.batch_shape[-2:] == len(batch) == self.z_q_0.size(0)
+                assert z_dist.batch_shape[-2:] == (len(batch), self.z_q_0.size(0))
 
                 # sample z_t from distribution z_dist
                 with pyro.poutine.scale(scale=kl_anneal):
-                    z_t = pyro.samle(
-                        "z_%d" % t, z_dist.mask(batch[:, t - 1 : t]).to_event(1)
+                    z_t = pyro.sample(
+                        "z_%d" % t, z_dist.mask(batch_mask[:, t - 1 : t]).to_event(1)
                     )
 
                 # set conditional var for next time step

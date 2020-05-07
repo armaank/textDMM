@@ -48,7 +48,9 @@ class Trainer(object):
         self.load_model = args.load_model
         self.save_opt = args.save_opt
         self.save_model = args.save_model
-        self.log = args.log
+        # setup logging
+        self.log = utils.get_logger(args.log)
+        self.log(args)
 
     def _validate(self, val_iter):
         """
@@ -65,24 +67,24 @@ class Trainer(object):
             # transpose to [B, seqlen, vocab_size] shape
             batch_data = torch.t(batch_data)
             # compute one hot character embedding
-            batch = nn.functional.one_hot(batch_data, self.vocab_size).float()
+            batch_onehot = nn.functional.one_hot(batch_data, self.vocab_size).float()
             # flip sequence for rnn
-            batch_reversed = utils.reverse_seq(batch, seqlens)
+            batch_reversed = utils.reverse_seq(batch_onehot, seqlens)
             batch_reversed = nn.utils.rnn.pack_padded_sequence(
                 batch_reversed, seqlens, batch_first=True
             )
             # compute temporal mask
-            batch_mask = utils.generate_batch_mask(batch, seqlens).cuda()
+            batch_mask = utils.generate_batch_mask(batch_onehot, seqlens).cuda()
             # perform evaluation
             val_nll += self.svi.evaluate_loss(
-                batch, batch_reversed, batch_mask, seqlens
+                batch_onehot, batch_reversed, batch_mask, seqlens
             )
 
         # resume training
         self.dmm.rnn.train()
 
         # report loss TODO: normalize
-        loss = val_loss / self.N_val_data
+        loss = val_nll / self.N_val_data
 
         return loss
 
@@ -91,7 +93,7 @@ class Trainer(object):
         process a batch (single epoch)
         """
         batch_loss = 0
-        loss = 0
+        epoch_loss = 0
         for ii, batch in enumerate(iter(train_iter)):
 
             batch_data = Variable(batch.text[0].to(self.device))
@@ -100,14 +102,14 @@ class Trainer(object):
             # transpose to [B, seqlen, vocab_size] shape
             batch_data = torch.t(batch_data)
             # compute one hot character embedding
-            batch = nn.functional.one_hot(batch_data, self.vocab_size).float()
+            batch_onehot = nn.functional.one_hot(batch_data, self.vocab_size).float()
             # flip sequence for rnn
-            batch_reversed = utils.reverse_seq(batch, seqlens)
+            batch_reversed = utils.reverse_seq(batch_onehot, seqlens)
             batch_reversed = nn.utils.rnn.pack_padded_sequence(
                 batch_reversed, seqlens, batch_first=True
             )
             # compute temporal mask
-            batch_mask = utils.generate_batch_mask(batch, seqlens).cuda()
+            batch_mask = utils.generate_batch_mask(batch_onehot, seqlens).cuda()
 
             # compute kl-div annealing factor
             if self.kl_ae > 0 and epoch < self.kl_ae:
@@ -122,11 +124,13 @@ class Trainer(object):
 
             # take gradient step
             batch_loss = self.svi.step(
-                batch_data, batch_reversed, batch_mask, seqlens, kl_anneal
+                batch_onehot, batch_reversed, batch_mask, seqlens, kl_anneal
             )
-            loss += batch_loss / (torch.sum(seqlens).float())
+            batch_loss = batch_loss / (torch.sum(seqlens).float())
+            print("loss at iteration {0} is {1}".format(ii, batch_loss))
+        epoch_loss = epoch_loss+batch_loss
 
-        return loss
+        return epoch_loss
 
     def train(self):
         """
@@ -137,14 +141,11 @@ class Trainer(object):
         np.random.seed(self.rand_seed)
         torch.manual_seed(self.rand_seed)
 
-        # setup logging
-        log = utils.get_logger(self.log)
-
         # TODO: make max_len a cli arg
-        max_len = 288
+        max_len = 64
 
         # load dataset TODO: make data fpath cli arg
-        train, val, test, vocab = datahandler.load_data("./data/ptb", 288)
+        train, val, test, vocab = datahandler.load_data("./data/ptb", max_len)
 
         self.vocab_size = len(vocab)
 
@@ -172,6 +173,8 @@ class Trainer(object):
             self.N_train_data / self.batch_size
             + int(self.N_train_data % self.batch_size > 0)
         )
+        self.log("N_train_data: %d  N_mini_batches: %d" % (self.N_train_data, self.N_batches)    )
+
 
         # instantiate the dmm
         self.dmm = DMM(input_dim=self.vocab_size, dropout=self.dropout)
@@ -203,7 +206,7 @@ class Trainer(object):
 
             times.append(time.time())
             t_elps = times[-1] - times[-2]
-            log(
+            self.log(
                 "epoch %04d -> train nll: %.4f \t t_elps=%.3f sec"
                 % (epoch, train_nll, t_elps)
             )
@@ -216,9 +219,9 @@ class Trainer(object):
         """
         saves the state of the network and optimizer for later
         """
-        log("saving model to %s" % self.save_model)
+        self.log("saving model to %s" % self.save_model)
         torch.save(self.dmm.state_dict(), args.save_model)
-        log("saving optimizer states to %s" % args.save_opt)
+        self.log("saving optimizer states to %s" % args.save_opt)
         self.adam.save(self.save_opt)
 
         pass
@@ -230,9 +233,9 @@ class Trainer(object):
         assert exists(args.load_opt) and exists(
             args.load_model
         ), "--load-model and/or --load-opt misspecified"
-        log("loading model from %s..." % self.load_model)
+        self.log("loading model from %s..." % self.load_model)
         self.dmm.load_state_dict(torch.load(self.load_model))
-        log("loading optimizer states from %s..." % self.load_opt)
+        self.log("loading optimizer states from %s..." % self.load_opt)
         self.adam.load(self.load_opt)
 
         pass

@@ -9,7 +9,7 @@ import torch
 from train import Trainer
 
 # TODO: make set_device a cli
-torch.cuda.set_device(0)
+torch.cuda.set_device(2)
 
 
 def main(args):
@@ -27,13 +27,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="lm")
 
-    parser.add_argument("--rand_seed", default=1, type=int, help="random seed")
+    parser.add_argument("--rand_seed", default=1234, type=int, help="random seed")
     parser.add_argument("--dev_num", default=2, type=int, help="gpu device number")
     parser.add_argument("--cuda", default=True, type=bool, help="enable cuda")
     parser.add_argument("--n_epoch", default=5000, type=float, help="num of epochs")
-    parser.add_argument("--batch_size", default=64, type=int, help="batch size")
+    parser.add_argument("--batch_size", default=50, type=int, help="batch size")
     parser.add_argument("--lr", default=1e-4, type=float, help="ADAM learning rate")
-    parser.add_argument("--beta1", default=0.9, type=float, help="ADAM beta1")
+    parser.add_argument("--beta1", default=0.99, type=float, help="ADAM beta1")
     parser.add_argument("--beta2", default=0.999, type=float, help="ADAM beta2")
     parser.add_argument("--wd", default=2.0, type=float, help="weight decay")
     parser.add_argument("--cn", default=0.001, type=float, help="grad. clipping")

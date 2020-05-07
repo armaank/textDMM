@@ -43,8 +43,8 @@ def pad_and_reverse(rnn_output, seqlens):
     unpacks hidden state as output of a torch rnn and reverses each seq
     """
 
-    rnn_output, _ = nn.utils.pad_packed_sequence(rnn_output, batch_first=True)
-    reversed_output = reverse_sequences(rnn_output, seqlens)
+    rnn_output, _ = nn.utils.rnn.pad_packed_sequence(rnn_output, batch_first=True)
+    reversed_output = reverse_seq(rnn_output, seqlens)
 
     return reversed_output
 
