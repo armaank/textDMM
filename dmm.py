@@ -153,13 +153,11 @@ class DMM(nn.Module):
         self.transition = GatedTransition(z_dim, transition_dim)
         self.combiner = Combiner(z_dim, rnn_dim)
 
-        # TODO: alter dropout scheme
         if num_layers == 1:
             rnn_dropout = 0.0
         else:
             rnn_dropout = dropout
 
-        # TODO: add option for bidirectional rnn?
         self.rnn = nn.RNN(
             input_size=input_dim,
             hidden_size=rnn_dim,
@@ -257,10 +255,6 @@ class DMM(nn.Module):
                 z_loc, z_scale = self.combiner(z_prev, rnn_output[:, t - 1, :])
 
                 z_dist = dist.Normal(z_loc, z_scale)
-                #print(batch.shape)
-                #print(len(batch))
-                #print(z_dist.batch_shape[-2:])
-                #print(self.z_q_0.size(0))
                 assert z_dist.event_shape == ()
                 assert z_dist.batch_shape[-2:] == (len(batch), self.z_q_0.size(0))
 

@@ -48,6 +48,7 @@ class Trainer(object):
         self.load_model = args.load_model
         self.save_opt = args.save_opt
         self.save_model = args.save_model
+        self.maxlen = args.maxlen
         # setup logging
         self.log = utils.get_logger(args.log)
         self.log(args)
@@ -83,7 +84,6 @@ class Trainer(object):
         # resume training
         self.dmm.rnn.train()
 
-        # report loss TODO: normalize
         loss = val_nll / self.N_val_data
 
         return loss
@@ -136,16 +136,11 @@ class Trainer(object):
         """
         trains a network with a given training set
         """
-        # TODO: add device cli arg
         self.device = torch.device("cuda")
         np.random.seed(self.rand_seed)
         torch.manual_seed(self.rand_seed)
 
-        # TODO: make max_len a cli arg
-        max_len = 64
-
-        # load dataset TODO: make data fpath cli arg
-        train, val, test, vocab = datahandler.load_data("./data/ptb", max_len)
+        train, val, test, vocab = datahandler.load_data("./data/ptb", self.maxlen)
 
         self.vocab_size = len(vocab)
 
@@ -164,8 +159,6 @@ class Trainer(object):
             self.N_train_data / self.batch_size
             + int(self.N_train_data % self.batch_size > 0)
         )
-
-        # TODO: might need to compute number of time slices for normalization
 
         self.N_train_data = len(train)
         self.N_val_data = len(val)
@@ -199,7 +192,7 @@ class Trainer(object):
         for epoch in range(self.n_epoch):
 
             if self.ckpt_f > 0 and epoch > 0 and epoch % self.ckpt_f == 0:
-                save_ckpt()
+                self.save_ckpt()
 
             # train and report metrics
             train_nll = self._train_batch(train_iter, epoch,)
@@ -220,8 +213,8 @@ class Trainer(object):
         saves the state of the network and optimizer for later
         """
         self.log("saving model to %s" % self.save_model)
-        torch.save(self.dmm.state_dict(), args.save_model)
-        self.log("saving optimizer states to %s" % args.save_opt)
+        torch.save(self.dmm.state_dict(), self.save_model)
+        self.log("saving optimizer states to %s" % self.save_opt)
         self.adam.save(self.save_opt)
 
         pass
